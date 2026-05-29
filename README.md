@@ -1,116 +1,151 @@
-# 🚀 Redis-like In-Memory Database (C++)
+# Redis-like In-Memory Database
 
-A lightweight, high-performance, Redis-inspired in-memory key-value database implemented from scratch in C++. This project demonstrates low-level systems programming, custom data structure design, non-blocking network I/O multiplexing, and concurrent multi-threaded task handling.
+A high-performance Redis-inspired in-memory key-value database built in C++ with support for concurrent clients, TTL expiration, ordered storage, and non-blocking network communication.
+
+## Features
+
+* Implemented core Redis-style commands:
+
+  * `SET`
+  * `GET`
+  * `DEL`
+  * `TTL`
+* Designed efficient storage using:
+
+  * **HashMap** for O(1) average key access
+  * **AVL Trees** for ordered storage and range queries
+* Built a non-blocking TCP server using:
+
+  * POSIX sockets
+  * `poll()` based event loop
+* Implemented:
+
+  * Concurrent client handling
+  * Thread pool for asynchronous task execution
+  * Heap-based scheduler for TTL expiration
+* Optimized for low-latency in-memory operations
 
 ---
 
-## 🧠 Architecture Overview
+# Tech Stack
 
-The database relies on a **single-threaded main event loop** for core operations to guarantee atomic execution without complex locking mechanisms. It utilizes a custom binary protocol over TCP for low-overhead communication.
+* C++
+* POSIX Sockets
+* TCP Networking
+* Multithreading
+* AVL Trees
+* Hash Maps
+* Heap Scheduling
+* Event-driven Architecture
+
+---
+
+# Architecture
 
 ```text
-                  +-----------------------------------+
-                  |        Client Connections         |
-                  +-----------------------------------+
-                                    |
-                                    v (TCP Sockets / Custom Protocol)
-                  +-----------------------------------+
-                  |    Event Loop: poll() (Non-block) |
-                  +-----------------------------------+
-                                    |
-            +-----------------------+-----------------------+
-            | (Read/Write)                                  | (Offload Heavy Deletions)
-            v                                               v
-+-----------------------+                       +-----------------------+
-|  Main Database State  |                       |   Worker Thread Pool  |
-|                       |                       +-----------------------+
-|  - Key-Value Hash     |                       | - Async Background    |
-|  - Min-Heap (TTL)     |                       |   Garbage Collection  |
-|  - Sorted Sets (AVL)  |                       +-----------------------+
-+-----------------------+
-Non-Blocking I/O Multi-plexing: Built using the POSIX poll() system call, allowing a single thread to concurrently handle thousands of client connections efficiently.
-Asynchronous Offloading: While the core DB logic is single-threaded to prevent race conditions, heavy resource-clearing operations (like deleting giant data structures) are safely dispatched to a background Thread Pool to prevent event-loop latency spikes.
-Efficient Expiration: Instead of checking every key periodically, a Min-Heap tracks Time-To-Live (TTL). The next key to expire is always at the top, making expiration checks incredibly lightweight.
-🛠 Tech Stack & Core Concepts
-Language: C++ (Clean, modern paradigms, structural memory management)
-Networking: POSIX Sockets (TCP/IP)
-Concurrency: Multi-threading via POSIX Threads (pthread)
-I/O Strategy: Reactor Pattern via poll()
-Memory Management: Custom intrusive data structures for maximum cache locality and minimal pointer overhead.
-📂 Project Structure
-Plaintext
-├── README.md              # Project documentation
-├── common.h               # Common utilities, serialization helpers, and shared macros
-│
-├── 🌐 Networking & Core Server
-│   ├── server.cpp         # Main server entry point and poll() event loop
-│   ├── client.cpp         # Interactive CLI client for issuing commands
-│   ├── thread_pool.h      # Thread pool header for asynchronous background tasks
-│   └── thread_pool.cpp    # Thread pool implementation
-│
-└── 🧠 Core Data Structures
-    ├── hashtable.h        # Custom dual-table chaining Hash Map (supports dynamic resizing)
-    ├── hashtable.cpp      # Hash Map implementation
-    ├── avl.h              # Self-balancing AVL Tree (used for Sorted Set range queries)
-    ├── avl.cpp            # AVL Tree implementation
-    ├── heap.h             # Min-Heap priority queue for proactive/reactive TTL tracking
-    ├── heap.cpp           # Min-Heap implementation
-    ├── zset.h             # Sorted Set structure (combines Hash Map + AVL Tree)
-    ├── zset.cpp           # Sorted Set implementation
-    └── list.h             # Intrusive circular doubly-linked list utility
-✨ Features & Supported Commands
-🔑 Key-Value Store
-Basic fast lookups with an average time complexity of O(1) during normal operation.
-SET key value: Store a string value.
-GET key: Retrieve a string value.
-DEL key: Remove a key (large memory blocks are freed asynchronously).
-⏳ TTL (Time-To-Live) Management
-Automated active and reactive eviction of stale keys.
-EXPIRE key seconds: Set an expiration timeout on a key.
-TTL key: Check remaining time-to-live for a key.
-📈 Sorted Sets (ZSet)
-Advanced structural data type mapping unique string members to numeric scores, kept perfectly sorted.
-ZADD zset score name: Add/update a member with a specific score (O(log n)).
-ZREM zset name: Remove a member from the sorted set (O(log n)).
-ZSCORE zset name: Get the score associated with the member (O(1)).
-ZQUERY zset score name offset limit: Query ranges of sorted elements efficiently via the AVL backend.
-🚀 Getting Started
-Prerequisites
-A Linux or Unix-like environment with a modern C++ compiler (g++ or clang++) supporting C++11 or higher.
-Building the Project
-Compile the server and client executables using your terminal:
-Bash
-# Compile the Server
-g++ -std=c++11 -Wall -O2 server.cpp hashtable.cpp avl.cpp heap.cpp zset.cpp thread_pool.cpp -o kv_server -lpthread
+Client
+   |
+   v
+TCP Socket Server
+   |
+   v
+poll() Event Loop
+   |
+   +----------------------+
+   |                      |
+   v                      v
+Thread Pool         In-Memory Store
+                           |
+                    +-------------+
+                    |             |
+                    v             v
+                 HashMap       AVL Tree
+                           |
+                           v
+                    TTL Scheduler
+```
 
-# Compile the Client
-g++ -std=c++11 -Wall -O2 client.cpp -o kv_client
-Running the Database
-Start the Server:
-Bash
-./kv_server
-Connect via the Client:
-In a separate terminal window, launch the interactive client:
-Bash
-./kv_client
-Try some commands:
-Plaintext
-> SET mykey helloworld
-(OK)
-> GET mykey
-"helloworld"
-> EXPIRE mykey 10
-(OK)
-> TTL mykey
-(integer) 8
-> ZADD myzset 1.5 item1
-(OK)
-> ZADD myzset 2.5 item2
-(OK)
-> ZQUERY myzset 1.0 "" 0 10
-1) "item1" (score: 1.5)
-2) "item2" (score: 2.5)
-🎨 Custom Protocol Design
-To keep network overhead to an absolute minimum, communication uses a structured TLV (Type-Length-Value) style binary protocol rather than text processing:
-Request/Response Framing: Every payload is prefixed with a 4-byte integer indicating the length of the string array.
-Array Elements: Each argument inside the array includes a 4-byte length prefix followed by the actual raw string data bytes.
+---
+
+# Project Structure
+
+```text
+.
+├── server.cpp
+├── client.cpp
+├── avl.cpp
+├── avl.h
+├── hashtable.cpp
+├── hashtable.h
+├── heap.cpp
+├── heap.h
+├── thread_pool.cpp
+├── thread_pool.h
+├── zset.cpp
+├── zset.h
+├── common.h
+├── Dockerfile
+└── README.md
+```
+
+---
+
+# Build & Run
+
+## Compile
+
+```bash
+g++ -std=c++17 -pthread *.cpp -o server
+```
+
+## Run Server
+
+```bash
+./server
+```
+
+## Run Client
+
+```bash
+./client
+```
+
+---
+
+# Example Commands
+
+```text
+SET name rudra
+GET name
+DEL name
+TTL name
+```
+
+---
+
+# Key Learnings
+
+* Event-driven server architecture
+* TCP socket programming
+* Concurrency and multithreading
+* Efficient in-memory data structures
+* Scheduling and expiration systems
+* Systems-level backend engineering
+
+---
+
+# Future Improvements
+
+* Persistence using Append Only File (AOF)
+* Replication support
+* Distributed sharding
+* LRU/LFU cache eviction
+* Authentication system
+* Benchmarking and profiling
+
+---
+
+# Author
+
+Rudra Narayan Yadav
+Mechanical Engineering, IIT Guwahati
