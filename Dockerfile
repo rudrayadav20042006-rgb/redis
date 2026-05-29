@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN g++ -std=c++17 -pthread *.cpp -o server
+RUN g++ -std=gnu++17 -pthread *.cpp -o server
 
 EXPOSE 8080
 
