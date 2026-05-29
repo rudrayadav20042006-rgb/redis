@@ -1,43 +1,30 @@
-# Redis-like In-Memory Database (C++)
+# 🚀 Redis-like In-Memory Database (C++)
 
-A lightweight Redis-inspired in-memory key-value database implemented in C++.  
-Supports basic data structures, networking, and concurrent request handling.
-
----
-
-## 🚀 Features
-
-- Key-Value storage (SET, GET, DEL)
-- TTL support (expire keys automatically)
-- Sorted Sets (ZADD, ZREM, ZSCORE, ZQUERY)
-- Concurrent client handling using thread pool
-- Non-blocking I/O with `poll()`
-- Custom serialization protocol
-- Efficient data structures:
-  - Hash Table (for key lookup)
-  - AVL Tree (for sorted sets)
-  - Min Heap (for TTL management)
+A lightweight, high-performance, Redis-inspired in-memory key-value database implemented from scratch in C++. This project demonstrates low-level systems programming, custom data structure design, non-blocking network I/O multiplexing, and concurrent multi-threaded task handling.
 
 ---
 
-## 🧠 Architecture
+## 🧠 Architecture Overview
 
-- **Server**: Handles multiple clients using non-blocking sockets  
-- **Client**: Sends requests using custom protocol  
-- **Thread Pool**: Handles async deletion for heavy operations  
-- **Event Loop**: Built using `poll()` for scalability  
+The database relies on a **single-threaded main event loop** for core operations to guarantee atomic execution without complex locking mechanisms. It utilizes a custom binary protocol over TCP for low-overhead communication.
 
-Example server logic: :contentReference[oaicite:0]{index=0}
-
----
-
-## 🛠 Tech Stack
-
-- C++
-- POSIX Sockets
-- Multithreading (pthread)
-- Data Structures (AVL Tree, HashMap, Heap)
-
----
-
-## 📂 Project Structure
+```text
+                  +-----------------------------------+
+                  |        Client Connections         |
+                  +-----------------------------------+
+                                    |
+                                    v (TCP Sockets / Custom Protocol)
+                  +-----------------------------------+
+                  |    Event Loop: poll() (Non-block) |
+                  +-----------------------------------+
+                                    |
+            +-----------------------+-----------------------+
+            | (Read/Write)                                  | (Offload Heavy Deletions)
+            v                                               v
++-----------------------+                       +-----------------------+
+|  Main Database State  |                       |   Worker Thread Pool  |
+|                       |                       +-----------------------+
+|  - Key-Value Hash     |                       | - Async Background    |
+|  - Min-Heap (TTL)     |                       |   Garbage Collection  |
+|  - Sorted Sets (AVL)  |                       +-----------------------+
++-----------------------+
